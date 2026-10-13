@@ -2,484 +2,269 @@
 // ROCK PAPER SCISSORS
 // ==========================================
 
-
-// ------------------------------------------
-// GAME STATE
-// ------------------------------------------
-
-let playerScore = 0;
-let computerScore = 0;
-let roundCount = 0;
-let currentStreak = 0;
-
-
-// ------------------------------------------
-// GAME CHOICES
-// ------------------------------------------
+const STORAGE_KEY = "rpsGame";
+const THINK_TIME = 700; // ms the hands shake before the reveal
 
 const choices = ["rock", "paper", "scissors"];
 
-const choiceIcons = {
+const icons = {
     rock: "✊",
     paper: "✋",
     scissors: "✌️"
 };
 
+// What beats what: key beats value
+const beats = {
+    rock: "scissors",
+    paper: "rock",
+    scissors: "paper"
+};
 
 // ------------------------------------------
-// LOCAL STORAGE
+// STATE
 // ------------------------------------------
 
-const STORAGE_KEY = "jeriRpsGame";
-
+let playerScore = 0;
+let computerScore = 0;
+let roundCount = 0;
+let streak = 0;
+let isPlaying = false;
 
 // ------------------------------------------
-// GET HTML ELEMENTS
+// ELEMENTS
 // ------------------------------------------
 
 const choiceButtons = document.querySelectorAll(".choice-btn");
-
-const playerScoreElement =
-    document.getElementById("player-score");
-
-const computerScoreElement =
-    document.getElementById("computer-score");
-
-const roundCountElement =
-    document.getElementById("round-count");
-
-const streakCountElement =
-    document.getElementById("streak-count");
-
-const playerChoiceElement =
-    document.getElementById("player-choice");
-
-const computerChoiceElement =
-    document.getElementById("computer-choice");
-
-const resultTitleElement =
-    document.getElementById("result-title");
-
-const resultDetailElement =
-    document.getElementById("result-detail");
-
-const resetButton =
-    document.getElementById("reset-btn");
-
+const playerScoreEl = document.getElementById("player-score");
+const computerScoreEl = document.getElementById("computer-score");
+const roundCountEl = document.getElementById("round-count");
+const streakEl = document.getElementById("streak-count");
+const playerHandEl = document.getElementById("player-choice");
+const computerHandEl = document.getElementById("computer-choice");
+const resultBox = document.querySelector(".result");
+const resultTitleEl = document.getElementById("result-title");
+const resultDetailEl = document.getElementById("result-detail");
+const resetButton = document.getElementById("reset-btn");
 
 // ------------------------------------------
-// CHECK ELEMENTS
-// ------------------------------------------
-
-console.log("RPS game loaded.");
-
-console.log("Choice buttons:", choiceButtons.length);
-
-console.log("Player score element:", playerScoreElement);
-
-console.log("Computer score element:", computerScoreElement);
-
-console.log("Round element:", roundCountElement);
-
-console.log("Result title:", resultTitleElement);
-
-
-// ------------------------------------------
-// LOAD SAVED GAME
-// ------------------------------------------
-
-function loadGame() {
-
-    const savedGame = localStorage.getItem(STORAGE_KEY);
-
-    if (!savedGame) {
-        updateDisplay();
-        return;
-    }
-
-    try {
-
-        const gameData = JSON.parse(savedGame);
-
-        playerScore = Number(gameData.playerScore) || 0;
-
-        computerScore = Number(gameData.computerScore) || 0;
-
-        roundCount = Number(gameData.roundCount) || 0;
-
-        currentStreak = Number(gameData.currentStreak) || 0;
-
-        updateDisplay();
-
-    } catch (error) {
-
-        console.error(
-            "Error loading saved game:",
-            error
-        );
-
-        resetGame();
-
-    }
-}
-
-
-// ------------------------------------------
-// SAVE GAME
+// STORAGE
 // ------------------------------------------
 
 function saveGame() {
-
-    const gameData = {
-
-        playerScore: playerScore,
-
-        computerScore: computerScore,
-
-        roundCount: roundCount,
-
-        currentStreak: currentStreak
-
-    };
-
-    localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(gameData)
-    );
+    try {
+        localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify({ playerScore, computerScore, roundCount, streak })
+        );
+    } catch (error) {
+        console.error("Unable to save game:", error);
+    }
 }
 
+function loadGame() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
 
-// ------------------------------------------
-// COMPUTER RANDOM CHOICE
-// ------------------------------------------
-
-function getComputerChoice() {
-
-    const randomIndex =
-        Math.floor(Math.random() * choices.length);
-
-    return choices[randomIndex];
-}
-
-
-// ------------------------------------------
-// DETERMINE WINNER
-// ------------------------------------------
-
-function determineWinner(
-    playerChoice,
-    computerChoice
-) {
-
-    // Draw
-    if (playerChoice === computerChoice) {
-        return "draw";
+        if (saved) {
+            playerScore = Number(saved.playerScore) || 0;
+            computerScore = Number(saved.computerScore) || 0;
+            roundCount = Number(saved.roundCount) || 0;
+            streak = Number(saved.streak) || 0;
+        }
+    } catch (error) {
+        console.error("Unable to load game:", error);
     }
 
-
-    // Player wins
-    if (
-        (playerChoice === "rock" &&
-            computerChoice === "scissors") ||
-
-        (playerChoice === "paper" &&
-            computerChoice === "rock") ||
-
-        (playerChoice === "scissors" &&
-            computerChoice === "paper")
-    ) {
-
-        return "player";
-
-    }
-
-
-    // Computer wins
-    return "computer";
+    updateDisplay();
 }
 
-
 // ------------------------------------------
-// CAPITALIZE
+// HELPERS
 // ------------------------------------------
 
 function capitalize(word) {
-
-    return word.charAt(0).toUpperCase()
-        + word.slice(1);
-
+    return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
-
-// ------------------------------------------
-// PLAY GAME
-// ------------------------------------------
-
-function playGame(playerChoice) {
-
-    console.log(
-        "Player selected:",
-        playerChoice
-    );
-
-
-    // Get computer choice
-    const computerChoice =
-        getComputerChoice();
-
-
-    console.log(
-        "Computer selected:",
-        computerChoice
-    );
-
-
-    // Find winner
-    const winner =
-        determineWinner(
-            playerChoice,
-            computerChoice
-        );
-
-
-    console.log(
-        "Winner:",
-        winner
-    );
-
-
-    // Increase round
-    roundCount++;
-
-
-    // Show choices
-    playerChoiceElement.textContent =
-        choiceIcons[playerChoice];
-
-    computerChoiceElement.textContent =
-        choiceIcons[computerChoice];
-
-
-    // --------------------------------------
-    // PLAYER WINS
-    // --------------------------------------
-
-    if (winner === "player") {
-
-        playerScore++;
-
-        currentStreak++;
-
-
-        resultTitleElement.textContent =
-            "You Win!";
-
-
-        resultDetailElement.textContent =
-            `${capitalize(playerChoice)} beats ${capitalize(computerChoice)}.`;
-
-    }
-
-
-    // --------------------------------------
-    // COMPUTER WINS
-    // --------------------------------------
-
-    else if (winner === "computer") {
-
-        computerScore++;
-
-        currentStreak = 0;
-
-
-        resultTitleElement.textContent =
-            "Computer Wins!";
-
-
-        resultDetailElement.textContent =
-            `${capitalize(computerChoice)} beats ${capitalize(playerChoice)}.`;
-
-    }
-
-
-    // --------------------------------------
-    // DRAW
-    // --------------------------------------
-
-    else {
-
-        currentStreak = 0;
-
-
-        resultTitleElement.textContent =
-            "It's a Draw!";
-
-
-        resultDetailElement.textContent =
-            `Both chose ${capitalize(playerChoice)}.`;
-
-    }
-
-
-    // Update screen
-    updateDisplay();
-
-
-    // Save state
-    saveGame();
-
+function getComputerChoice() {
+    return choices[Math.floor(Math.random() * choices.length)];
 }
 
+function determineWinner(player, computer) {
+    if (player === computer) return "draw";
+    return beats[player] === computer ? "player" : "computer";
+}
+
+// Replays a CSS animation class on an element
+function animate(element, className) {
+    element.classList.remove(className);
+    void element.offsetWidth; // force reflow so the animation restarts
+    element.classList.add(className);
+}
+
+function bump(element) {
+    animate(element, "bump");
+}
+
+function setLocked(locked) {
+    isPlaying = locked;
+    choiceButtons.forEach((button) => {
+        button.disabled = locked;
+    });
+}
+
+function clearHandState() {
+    [playerHandEl, computerHandEl].forEach((hand) => {
+        hand.classList.remove("shake", "reveal", "winner", "loser");
+    });
+}
 
 // ------------------------------------------
-// UPDATE DISPLAY
+// DISPLAY
 // ------------------------------------------
 
 function updateDisplay() {
-
-    playerScoreElement.textContent =
-        playerScore;
-
-    computerScoreElement.textContent =
-        computerScore;
-
-    roundCountElement.textContent =
-        roundCount;
-
-    streakCountElement.textContent =
-        currentStreak;
-
+    playerScoreEl.textContent = playerScore;
+    computerScoreEl.textContent = computerScore;
+    roundCountEl.textContent = roundCount;
+    streakEl.textContent = streak;
 }
 
+function showResult(winner, player, computer) {
+    resultBox.classList.remove("win", "lose");
+
+    if (winner === "player") {
+        resultTitleEl.textContent = "You win";
+        resultDetailEl.textContent =
+            `${capitalize(player)} beats ${capitalize(computer)}.`;
+        resultBox.classList.add("win");
+    } else if (winner === "computer") {
+        resultTitleEl.textContent = "Computer wins";
+        resultDetailEl.textContent =
+            `${capitalize(computer)} beats ${capitalize(player)}.`;
+        resultBox.classList.add("lose");
+    } else {
+        resultTitleEl.textContent = "It's a draw";
+        resultDetailEl.textContent = `Both chose ${capitalize(player)}.`;
+    }
+
+    animate(resultBox, "animate");
+}
 
 // ------------------------------------------
-// RESET GAME
+// PLAY A ROUND
+// ------------------------------------------
+
+function playGame(playerChoice) {
+    if (isPlaying) return;
+
+    setLocked(true);
+
+    const computerChoice = getComputerChoice();
+    const winner = determineWinner(playerChoice, computerChoice);
+
+    // Highlight the chosen button
+    choiceButtons.forEach((button) => {
+        button.classList.toggle("selected", button.dataset.choice === playerChoice);
+    });
+
+    // Phase 1 — both hands shake as fists
+    clearHandState();
+    resultBox.classList.remove("win", "lose", "animate");
+    resultTitleEl.textContent = "Rock… paper… scissors…";
+    resultDetailEl.textContent = "";
+
+    playerHandEl.textContent = icons.rock;
+    computerHandEl.textContent = icons.rock;
+    playerHandEl.classList.add("shake");
+    computerHandEl.classList.add("shake");
+
+    // Phase 2 — reveal and score
+    setTimeout(() => {
+        clearHandState();
+
+        playerHandEl.textContent = icons[playerChoice];
+        computerHandEl.textContent = icons[computerChoice];
+
+        animate(playerHandEl, "reveal");
+        animate(computerHandEl, "reveal");
+
+        roundCount++;
+        bump(roundCountEl);
+
+        if (winner === "player") {
+            playerScore++;
+            streak++;
+            bump(playerScoreEl);
+            bump(streakEl);
+            playerHandEl.classList.add("winner");
+            computerHandEl.classList.add("loser");
+        } else if (winner === "computer") {
+            computerScore++;
+            streak = 0;
+            bump(computerScoreEl);
+            computerHandEl.classList.add("winner");
+            playerHandEl.classList.add("loser");
+        } else {
+            streak = 0;
+        }
+
+        showResult(winner, playerChoice, computerChoice);
+        updateDisplay();
+        saveGame();
+
+        choiceButtons.forEach((button) => button.classList.remove("selected"));
+        setLocked(false);
+    }, THINK_TIME);
+}
+
+// ------------------------------------------
+// RESET
 // ------------------------------------------
 
 function resetGame() {
+    if (isPlaying) return;
 
     playerScore = 0;
-
     computerScore = 0;
-
     roundCount = 0;
+    streak = 0;
 
-    currentStreak = 0;
+    clearHandState();
+    playerHandEl.textContent = "❔";
+    computerHandEl.textContent = "❔";
 
+    resultBox.classList.remove("win", "lose");
+    resultTitleEl.textContent = "Make your move";
+    resultDetailEl.textContent = "Choose rock, paper or scissors to start.";
+    animate(resultBox, "animate");
 
-    // Reset choices
-    playerChoiceElement.textContent =
-        "❔";
-
-    computerChoiceElement.textContent =
-        "❔";
-
-
-    // Reset result
-    resultTitleElement.textContent =
-        "Make Your Move";
-
-    resultDetailElement.textContent =
-        "Choose Rock, Paper or Scissors to start the game.";
-
-
-    // Update score
     updateDisplay();
-
-
-    // Save reset state
     saveGame();
-
 }
 
-
 // ------------------------------------------
-// BUTTON EVENTS
+// EVENTS
 // ------------------------------------------
 
 choiceButtons.forEach((button) => {
-
-    button.addEventListener(
-        "click",
-        function () {
-
-            const selectedChoice =
-                button.dataset.choice;
-
-            playGame(selectedChoice);
-
-        }
-    );
-
+    button.addEventListener("click", () => playGame(button.dataset.choice));
 });
 
+resetButton.addEventListener("click", resetGame);
+
+// Keyboard: R = Rock, P = Paper, S = Scissors
+document.addEventListener("keydown", (event) => {
+    if (event.ctrlKey || event.altKey || event.metaKey || event.repeat) return;
+
+    const keyMap = { r: "rock", p: "paper", s: "scissors" };
+    const choice = keyMap[event.key.toLowerCase()];
+
+    if (choice) playGame(choice);
+});
 
 // ------------------------------------------
-// KEYBOARD CONTROLS
-// ------------------------------------------
-//
-// R = Rock
-// P = Paper
-// S = Scissors
-//
-// Browser shortcuts such as Ctrl + R
-// are ignored by this game.
-// ------------------------------------------
-
-document.addEventListener(
-    "keydown",
-    function (event) {
-
-        // Do NOT interfere with browser shortcuts
-        if (
-            event.ctrlKey ||
-            event.altKey ||
-            event.metaKey
-        ) {
-            return;
-        }
-
-
-        const key =
-            event.key.toLowerCase();
-
-
-        if (key === "r") {
-
-            playGame("rock");
-
-        }
-
-        else if (key === "p") {
-
-            playGame("paper");
-
-        }
-
-        else if (key === "s") {
-
-            playGame("scissors");
-
-        }
-
-    }
-);
-
-
-// ------------------------------------------
-// RESET BUTTON
-// ------------------------------------------
-
-resetButton.addEventListener(
-    "click",
-    resetGame
-);
-
-
-// ------------------------------------------
-// START GAME
+// START
 // ------------------------------------------
 
 loadGame();
-
-updateDisplay();
