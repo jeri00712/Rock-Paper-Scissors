@@ -3,7 +3,8 @@
 // ==========================================
 
 const STORAGE_KEY = "rpsGame";
-const THINK_TIME = 700; // ms the hands shake before the reveal
+const COUNTDOWN = ["Rock", "Paper", "Scissors", "Shoot!"];
+const COUNTDOWN_STEP = 300; // ms per word
 
 const choices = ["rock", "paper", "scissors"];
 
@@ -13,12 +14,14 @@ const icons = {
     scissors: "✌️"
 };
 
-// What beats what: key beats value
+// key beats value
 const beats = {
     rock: "scissors",
     paper: "rock",
     scissors: "paper"
 };
+
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // ------------------------------------------
 // STATE
@@ -34,16 +37,21 @@ let isPlaying = false;
 // ELEMENTS
 // ------------------------------------------
 
+const card = document.getElementById("card");
 const choiceButtons = document.querySelectorAll(".choice-btn");
 const playerScoreEl = document.getElementById("player-score");
 const computerScoreEl = document.getElementById("computer-score");
 const roundCountEl = document.getElementById("round-count");
 const streakEl = document.getElementById("streak-count");
+const streakBox = document.getElementById("streak-box");
 const playerHandEl = document.getElementById("player-choice");
 const computerHandEl = document.getElementById("computer-choice");
-const resultBox = document.querySelector(".result");
+const burstEl = document.querySelector(".burst");
+const resultBox = document.getElementById("result");
 const resultTitleEl = document.getElementById("result-title");
 const resultDetailEl = document.getElementById("result-detail");
+const winrateText = document.getElementById("winrate-text");
+const winrateFill = document.getElementById("winrate-fill");
 const resetButton = document.getElementById("reset-btn");
 
 // ------------------------------------------
@@ -75,35 +83,30 @@ function loadGame() {
         console.error("Unable to load game:", error);
     }
 
-    updateDisplay();
+    updateDisplay(false);
 }
 
 // ------------------------------------------
 // HELPERS
 // ------------------------------------------
 
-function capitalize(word) {
-    return word.charAt(0).toUpperCase() + word.slice(1);
-}
+const capitalize = (word) => word.charAt(0).toUpperCase() + word.slice(1);
 
-function getComputerChoice() {
-    return choices[Math.floor(Math.random() * choices.length)];
-}
+const getComputerChoice = () =>
+    choices[Math.floor(Math.random() * choices.length)];
 
 function determineWinner(player, computer) {
     if (player === computer) return "draw";
     return beats[player] === computer ? "player" : "computer";
 }
 
-// Replays a CSS animation class on an element
-function animate(element, className) {
-    element.classList.remove(className);
-    void element.offsetWidth; // force reflow so the animation restarts
-    element.classList.add(className);
-}
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function bump(element) {
-    animate(element, "bump");
+// Restart a CSS animation class
+function replay(element, className) {
+    element.classList.remove(className);
+    void element.offsetWidth; // force reflow
+    element.classList.add(className);
 }
 
 function setLocked(locked) {
@@ -113,109 +116,209 @@ function setLocked(locked) {
     });
 }
 
-function clearHandState() {
+function clearHands() {
     [playerHandEl, computerHandEl].forEach((hand) => {
-        hand.classList.remove("shake", "reveal", "winner", "loser");
+        hand.classList.remove("shake", "reveal", "winner", "loser", "tie");
     });
+}
+
+function playCardEffect(name) {
+    card.classList.remove("is-win", "is-lose", "is-draw");
+    void card.offsetWidth;
+    card.classList.add(name);
 }
 
 // ------------------------------------------
 // DISPLAY
 // ------------------------------------------
 
-function updateDisplay() {
-    playerScoreEl.textContent = playerScore;
-    computerScoreEl.textContent = computerScore;
-    roundCountEl.textContent = roundCount;
-    streakEl.textContent = streak;
+// Sets a number and plays a "tick" animation if it changed
+function setNumber(element, value, animated) {
+    const text = String(value);
+    if (element.textContent === text) return;
+
+    element.textContent = text;
+    if (animated) replay(element, "tick");
 }
 
-function showResult(winner, player, computer) {
-    resultBox.classList.remove("win", "lose");
+function updateDisplay(animated = true) {
+    setNumber(playerScoreEl, playerScore, animated);
+    setNumber(computerScoreEl, computerScore, animated);
+    setNumber(roundCountEl, roundCount, animated);
+    setNumber(streakEl, streak, animated);
 
-    if (winner === "player") {
-        resultTitleEl.textContent = "You win";
-        resultDetailEl.textContent =
-            `${capitalize(player)} beats ${capitalize(computer)}.`;
-        resultBox.classList.add("win");
-    } else if (winner === "computer") {
-        resultTitleEl.textContent = "Computer wins";
-        resultDetailEl.textContent =
-            `${capitalize(computer)} beats ${capitalize(player)}.`;
-        resultBox.classList.add("lose");
-    } else {
-        resultTitleEl.textContent = "It's a draw";
-        resultDetailEl.textContent = `Both chose ${capitalize(player)}.`;
+    const rate = roundCount === 0 ? 0 : Math.round((playerScore / roundCount) * 100);
+    winrateText.textContent = `${rate}%`;
+    winrateFill.style.width = `${rate}%`;
+
+    streakBox.classList.toggle("hot", streak >= 3);
+}
+
+function setResult(type, title, detail) {
+    resultBox.classList.remove("win", "lose", "draw", "counting", "animate");
+    if (type) resultBox.classList.add(type);
+
+    resultTitleEl.textContent = title;
+    resultDetailEl.textContent = detail;
+
+    void resultBox.offsetWidth;
+    resultBox.classList.add("animate");
+}
+
+// ------------------------------------------
+// CONFETTI
+// ------------------------------------------
+
+const canvas = document.getElementById("confetti");
+const ctx = canvas.getContext("2d");
+const confettiColors = ["#7c5cff", "#22d3ee", "#f472b6", "#34d399", "#fbbf24", "#ffffff"];
+
+let particles = [];
+let confettiFrame = null;
+
+function resizeCanvas() {
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * ratio;
+    canvas.height = window.innerHeight * ratio;
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+}
+
+function launchConfetti(count) {
+    if (reduceMotion) return;
+
+    const originX = window.innerWidth / 2;
+    const originY = window.innerHeight * 0.45;
+
+    for (let i = 0; i < count; i++) {
+        const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 0.95;
+        const speed = 6 + Math.random() * 10;
+
+        particles.push({
+            x: originX,
+            y: originY,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            size: 5 + Math.random() * 6,
+            rotation: Math.random() * Math.PI,
+            spin: (Math.random() - 0.5) * 0.35,
+            color: confettiColors[Math.floor(Math.random() * confettiColors.length)],
+            alpha: 1
+        });
     }
 
-    animate(resultBox, "animate");
+    if (!confettiFrame) confettiFrame = requestAnimationFrame(drawConfetti);
 }
+
+function drawConfetti() {
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+    particles = particles.filter((p) => p.alpha > 0 && p.y < window.innerHeight + 30);
+
+    particles.forEach((p) => {
+        p.vy += 0.3;      // gravity
+        p.vx *= 0.99;     // air drag
+        p.x += p.vx;
+        p.y += p.vy;
+        p.rotation += p.spin;
+        p.alpha -= 0.007;
+
+        ctx.save();
+        ctx.globalAlpha = Math.max(p.alpha, 0);
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+        ctx.restore();
+    });
+
+    if (particles.length > 0) {
+        confettiFrame = requestAnimationFrame(drawConfetti);
+    } else {
+        confettiFrame = null;
+        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    }
+}
+
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
 
 // ------------------------------------------
 // PLAY A ROUND
 // ------------------------------------------
 
-function playGame(playerChoice) {
+async function playGame(playerChoice) {
     if (isPlaying) return;
-
     setLocked(true);
 
     const computerChoice = getComputerChoice();
     const winner = determineWinner(playerChoice, computerChoice);
 
-    // Highlight the chosen button
     choiceButtons.forEach((button) => {
         button.classList.toggle("selected", button.dataset.choice === playerChoice);
     });
 
-    // Phase 1 — both hands shake as fists
-    clearHandState();
-    resultBox.classList.remove("win", "lose", "animate");
-    resultTitleEl.textContent = "Rock… paper… scissors…";
-    resultDetailEl.textContent = "";
-
+    // Phase 1 — both fists shake while the words count down
+    clearHands();
     playerHandEl.textContent = icons.rock;
     computerHandEl.textContent = icons.rock;
     playerHandEl.classList.add("shake");
     computerHandEl.classList.add("shake");
 
-    // Phase 2 — reveal and score
-    setTimeout(() => {
-        clearHandState();
+    resultBox.classList.remove("win", "lose", "draw", "animate");
+    resultDetailEl.textContent = "";
 
-        playerHandEl.textContent = icons[playerChoice];
-        computerHandEl.textContent = icons[computerChoice];
+    for (const word of COUNTDOWN) {
+        resultTitleEl.textContent = word;
+        replay(resultBox, "counting");
+        await wait(reduceMotion ? 80 : COUNTDOWN_STEP);
+    }
 
-        animate(playerHandEl, "reveal");
-        animate(computerHandEl, "reveal");
+    // Phase 2 — reveal
+    clearHands();
+    playerHandEl.textContent = icons[playerChoice];
+    computerHandEl.textContent = icons[computerChoice];
+    replay(playerHandEl, "reveal");
+    replay(computerHandEl, "reveal");
+    replay(burstEl, "go");
 
-        roundCount++;
-        bump(roundCountEl);
+    roundCount++;
 
-        if (winner === "player") {
-            playerScore++;
-            streak++;
-            bump(playerScoreEl);
-            bump(streakEl);
-            playerHandEl.classList.add("winner");
-            computerHandEl.classList.add("loser");
-        } else if (winner === "computer") {
-            computerScore++;
-            streak = 0;
-            bump(computerScoreEl);
-            computerHandEl.classList.add("winner");
-            playerHandEl.classList.add("loser");
-        } else {
-            streak = 0;
-        }
+    if (winner === "player") {
+        playerScore++;
+        streak++;
 
-        showResult(winner, playerChoice, computerChoice);
-        updateDisplay();
-        saveGame();
+        playerHandEl.classList.add("winner");
+        computerHandEl.classList.add("loser");
+        setResult("win", "You win!", `${capitalize(playerChoice)} beats ${capitalize(computerChoice)}.`);
 
-        choiceButtons.forEach((button) => button.classList.remove("selected"));
-        setLocked(false);
-    }, THINK_TIME);
+        playCardEffect("is-win");
+        launchConfetti(streak >= 3 ? 170 : 90);
+
+    } else if (winner === "computer") {
+        computerScore++;
+        streak = 0;
+
+        computerHandEl.classList.add("winner");
+        playerHandEl.classList.add("loser");
+        setResult("lose", "Computer wins", `${capitalize(computerChoice)} beats ${capitalize(playerChoice)}.`);
+
+        playCardEffect("is-lose");
+
+    } else {
+        streak = 0;
+
+        playerHandEl.classList.add("tie");
+        computerHandEl.classList.add("tie");
+        setResult("draw", "It's a draw", `Both chose ${capitalize(playerChoice)}.`);
+
+        playCardEffect("is-draw");
+    }
+
+    updateDisplay(true);
+    saveGame();
+
+    choiceButtons.forEach((button) => button.classList.remove("selected"));
+    setLocked(false);
 }
 
 // ------------------------------------------
@@ -230,16 +333,15 @@ function resetGame() {
     roundCount = 0;
     streak = 0;
 
-    clearHandState();
+    clearHands();
     playerHandEl.textContent = "❔";
     computerHandEl.textContent = "❔";
+    replay(playerHandEl, "reveal");
+    replay(computerHandEl, "reveal");
 
-    resultBox.classList.remove("win", "lose");
-    resultTitleEl.textContent = "Make your move";
-    resultDetailEl.textContent = "Choose rock, paper or scissors to start.";
-    animate(resultBox, "animate");
+    setResult("", "Make your move", "Choose rock, paper or scissors to begin.");
 
-    updateDisplay();
+    updateDisplay(true);
     saveGame();
 }
 
@@ -249,6 +351,13 @@ function resetGame() {
 
 choiceButtons.forEach((button) => {
     button.addEventListener("click", () => playGame(button.dataset.choice));
+
+    // Cursor-following glow
+    button.addEventListener("pointermove", (event) => {
+        const rect = button.getBoundingClientRect();
+        button.style.setProperty("--mx", `${event.clientX - rect.left}px`);
+        button.style.setProperty("--my", `${event.clientY - rect.top}px`);
+    });
 });
 
 resetButton.addEventListener("click", resetGame);

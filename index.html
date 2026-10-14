@@ -3,21 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="A minimalist Rock Paper Scissors game built with HTML, CSS and JavaScript.">
+    <meta name="description" content="An elegant Rock Paper Scissors game built with HTML, CSS and JavaScript.">
+    <meta name="theme-color" content="#0b0b14">
     <title>Rock Paper Scissors</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
+    <!-- Animated background -->
+    <div class="bg" aria-hidden="true">
+        <span class="orb orb-1"></span>
+        <span class="orb orb-2"></span>
+        <span class="orb orb-3"></span>
+    </div>
+
+    <canvas id="confetti" aria-hidden="true"></canvas>
+
     <main class="app">
 
         <header class="intro">
-            <p class="eyebrow">Game</p>
-            <h1>Rock Paper Scissors</h1>
-            <p class="subtitle">Pick a move. Beat the computer.</p>
+            <p class="eyebrow">Best of luck</p>
+            <h1>Rock <span>Paper</span> Scissors</h1>
+            <p class="subtitle">Pick a move. Outsmart the computer.</p>
         </header>
 
-        <section class="card" aria-label="Game">
+        <section class="card" id="card" aria-label="Game">
 
             <!-- Scoreboard -->
             <div class="scoreboard" aria-label="Score">
@@ -25,7 +39,7 @@
                     <span class="score-label">You</span>
                     <strong id="player-score">0</strong>
                 </div>
-                <div class="score">
+                <div class="score score-mid">
                     <span class="score-label">Round</span>
                     <strong id="round-count">0</strong>
                 </div>
@@ -37,23 +51,26 @@
 
             <!-- Battle -->
             <div class="battle" aria-live="polite">
-                <div class="hand-box">
+                <div class="hand-box left">
                     <span class="hand-label">You</span>
                     <div class="hand" id="player-choice">❔</div>
                 </div>
 
-                <span class="vs" aria-hidden="true">vs</span>
+                <div class="vs-wrap" aria-hidden="true">
+                    <span class="burst"></span>
+                    <span class="vs">VS</span>
+                </div>
 
-                <div class="hand-box">
+                <div class="hand-box right">
                     <span class="hand-label">Computer</span>
                     <div class="hand" id="computer-choice">❔</div>
                 </div>
             </div>
 
             <!-- Result -->
-            <div class="result">
+            <div class="result" id="result">
                 <h2 id="result-title">Make your move</h2>
-                <p id="result-detail">Choose rock, paper or scissors to start.</p>
+                <p id="result-detail">Choose rock, paper or scissors to begin.</p>
             </div>
 
             <!-- Choices -->
@@ -77,14 +94,26 @@
                 </button>
             </div>
 
-            <!-- Footer of card -->
-            <div class="card-footer">
-                <div class="streak">
-                    <span>Streak</span>
-                    <strong id="streak-count">0</strong>
+            <!-- Stats -->
+            <div class="stats">
+                <div class="winrate">
+                    <div class="winrate-top">
+                        <span>Win rate</span>
+                        <strong id="winrate-text">0%</strong>
+                    </div>
+                    <div class="bar"><span id="winrate-fill"></span></div>
                 </div>
-                <button type="button" id="reset-btn" class="ghost-btn">Reset</button>
+
+                <div class="streak" id="streak-box">
+                    <span class="flame">🔥</span>
+                    <div>
+                        <span class="streak-label">Streak</span>
+                        <strong id="streak-count">0</strong>
+                    </div>
+                </div>
             </div>
+
+            <button type="button" id="reset-btn" class="ghost-btn">Reset game</button>
 
         </section>
 
